@@ -1,0 +1,85 @@
+{
+  "_meta": {
+    "description": "Gold annotations for the TraceVault synthetic corpus. All facts are original synthetic fixture content. Artifact key prefixes (e.g. 'docA:') match artifact gold_key prefixes; bare keys match exact gold_key values.",
+    "primary_scenario": "single_document_deletion_docA"
+  },
+  "expected_affected": {
+    "docA": {
+      "prefixes": ["docA:", "summaryAB", "answer_unique_A", "cache_unique_A", "answer_sos_docA"],
+      "note": "docA version + chunks + vectors, the multi-source summary (claim 1 dies, claim 2 survives via docB), the cached unique-fact answer and its cache entry, the transitive answer."
+    }
+  },
+  "expected_unaffected": {
+    "docA": {
+      "prefixes": ["docB:", "docC:", "docD:", "docE:", "docF:", "docG:", "docH:", "docI:", "docJ:", "docK:", "docL:", "summary_auto_docB", "summary_auto_docC", "summary_auto_docH", "answer_shared_lms"],
+      "note": "All other documents and their artifacts survive; the LMS shared-fact answer survives (docB remains)."
+    }
+  },
+  "probes": [
+    {
+      "id": "probe_nightingale_direct",
+      "query": "When is the Nightingale phase 2 rollout scheduled?",
+      "target": "docA",
+      "kind": "direct",
+      "supported_only_by": ["docA"],
+      "expect": "blocked_after_deletion"
+    },
+    {
+      "id": "probe_nightingale_paraphrase",
+      "query": "What date will phase two of the Nightingale project be rolled out?",
+      "target": "docA",
+      "kind": "paraphrase",
+      "supported_only_by": ["docA"],
+      "expect": "blocked_after_deletion"
+    },
+    {
+      "id": "probe_nightingale_numeric",
+      "query": "What is the Nightingale phase 2 budget amount in crore rupees?",
+      "target": "docA",
+      "kind": "numerical",
+      "supported_only_by": ["docA"],
+      "expect": "blocked_after_deletion"
+    },
+    {
+      "id": "probe_lms_shared",
+      "query": "Where must the quarterly security compliance training be completed?",
+      "target": "docA",
+      "kind": "shared",
+      "supported_only_by": ["docA", "docB"],
+      "expect": "independently_supported_survives_via_docB"
+    },
+    {
+      "id": "probe_cafeteria_control",
+      "query": "What cuisine is served on Wednesdays in the cafeteria?",
+      "target": "docC",
+      "kind": "control",
+      "supported_only_by": ["docC"],
+      "expect": "available"
+    },
+    {
+      "id": "probe_fitness_numeric",
+      "query": "What are the fitness center hours on weekends?",
+      "target": "docJ",
+      "kind": "numerical",
+      "supported_only_by": ["docJ"],
+      "expect": "available"
+    }
+  ],
+  "repair_expectations": {
+    "summaryAB": {
+      "claim_1": "The Nightingale phase 2 rollout is scheduled for 14 March 2026 with a budget of 4.2 crore rupees.",
+      "claim_1_survives": false,
+      "claim_2": "All engineering staff must complete the quarterly security compliance training on the Aurora LMS before 30 June.",
+      "claim_2_survives": true,
+      "surviving_support": "docB",
+      "expected_outcome": "replacement_summary_contains_only_independently_supported_claim"
+    }
+  },
+  "scenario_checks": [
+    "single-source deletion blocks document, chunks, vectors, summaries, answers and cache paths",
+    "multi-source repair removes unique deleted facts and preserves independently supported facts",
+    "unrelated documents remain usable under provenance-based invalidation",
+    "cache hit before deletion; cache miss after deletion",
+    "unknown-provenance artifact triggers coverage warning and conservative invalidation"
+  ]
+}

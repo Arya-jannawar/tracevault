@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Import check
+        run: python -c "import app.main; print('import ok')"
+        env:
+          SESSION_SECRET: ci-secret
+          SEED_ON_START: "false"
+      - name: Unit tests (SQLite + labeled test adapters)
+        run: python -m pytest
+        env:
+          SESSION_SECRET: ci-secret
+
+  backend-integration:
+    runs-on: ubuntu-latest
+    needs: backend
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:17.2-alpine
+        env:
+          POSTGRES_USER: tracevault
+          POSTGRES_PASSWORD: tracevault
+          POSTGRES_DB: tracevault
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U tracevault"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+      qdrant:
+        image: qdrant/qdrant:v1.14.1
+        ports: ["6333:6333"]
+      redis:
+        image: redis:7.4.1-alpine
+        ports: ["6379:6379"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Integration tests (real services)
+        run: python -m pytest -m integration -o addopts=""
+        env:
+          SESSION_SECRET: ci-secret
+          TV_TEST_DATABASE_URL: postgresql+psycopg://tracevault:tracevault@127.0.0.1:5433/tracevault
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install
+        run: npm ci || npm install
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Unit tests
+        run: npx vitest run
+      - name: Production build
+        run: npm run build

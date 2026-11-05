@@ -1,0 +1,121 @@
+name: tracevault
+
+services:
+  postgres:
+    image: postgres:17.2-alpine
+    environment:
+      POSTGRES_USER: tracevault
+      POSTGRES_PASSWORD: tracevault
+      POSTGRES_DB: tracevault
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tracevault -d tracevault"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  qdrant:
+    image: qdrant/qdrant:v1.14.1
+    ports:
+      - "127.0.0.1:6333:6333"
+    volumes:
+      - qdrantdata:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "(exec 3<>/dev/tcp/127.0.0.1/6333 && echo -e 'GET /healthz HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3) | head -1 | grep -q 200"]
+      interval: 5s
+      timeout: 4s
+      retries: 30
+
+  redis:
+    image: redis:7.4.1-alpine
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://tracevault:tracevault@postgres:5432/tracevault
+      QDRANT_URL: http://qdrant:6333
+      REDIS_URL: redis://redis:6379/0
+      SESSION_SECRET: ${SESSION_SECRET:-dev-only-secret-change-me}
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-deterministic}
+      LLM_PROVIDER: ${LLM_PROVIDER:-extractive}
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:11434/v1}
+      LLM_MODEL: ${LLM_MODEL:-qwen2.5:3b-instruct}
+      ENABLE_SELECTIVE_REPAIR: ${ENABLE_SELECTIVE_REPAIR:-false}
+      ENABLE_SEMANTIC_CACHE: ${ENABLE_SEMANTIC_CACHE:-false}
+      SEED_ON_START: ${SEED_ON_START:-true}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8000:8000"
+    command: >
+      sh -c "alembic upgrade head &&
+             python -m app.bootstrap &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://tracevault:tracevault@postgres:5432/tracevault
+      QDRANT_URL: http://qdrant:6333
+      REDIS_URL: redis://redis:6379/0
+      SESSION_SECRET: dev-only-secret-change-me
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-deterministic}
+      LLM_PROVIDER: ${LLM_PROVIDER:-extractive}
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:11434/v1}
+      LLM_MODEL: ${LLM_MODEL:-qwen2.5:3b-instruct}
+      ENABLE_SELECTIVE_REPAIR: ${ENABLE_SELECTIVE_REPAIR:-false}
+      ENABLE_SEMANTIC_CACHE: ${ENABLE_SEMANTIC_CACHE:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: sh -c "alembic upgrade head && python -m app.worker"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    depends_on:
+      - api
+    ports:
+      - "127.0.0.1:8080:80"
+
+  # Optional local LLM: docker compose --profile llm up -d
+  # Then: docker compose exec ollama ollama pull qwen2.5:3b-instruct
+  # and set LLM_PROVIDER=openai-compatible, LLM_BASE_URL=http://127.0.0.1:11434/v1
+  ollama:
+    image: ollama/ollama:0.5.4
+    profiles: ["llm"]
+    ports:
+      - "127.0.0.1:11434:11434"
+    volumes:
+      - ollamadata:/root/.ollama
+
+volumes:
+  pgdata:
+  qdrantdata:
+  ollamadata:

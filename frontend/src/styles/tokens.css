@@ -1,0 +1,57 @@
+/* TraceVault design tokens — "research control room": deep ink surfaces,
+   electric lime actions, cool graph hues, precise cool-gray text. */
+:root {
+  /* Surfaces */
+  --bg: #080c14;
+  --bg-sidebar: #0c1320;
+  --panel: #111b2c;
+  --panel-2: #0e1726;
+  --panel-raised: #16233a;
+  --inset: #0a101c;
+
+  /* Text */
+  --text: #f4f7fc;
+  --text-2: #a8b5ca;
+  --text-3: #6b7a93;
+
+  /* Lines */
+  --border: rgba(168, 181, 202, 0.14);
+  --border-strong: rgba(168, 181, 202, 0.28);
+
+  /* Brand + semantics */
+  --accent: #c7ff5e; /* electric lime — primary actions */
+  --accent-ink: #101801; /* dark text on lime */
+  --accent-dim: rgba(199, 255, 94, 0.12);
+  --info: #45d9f5; /* cyan — graph / running */
+  --info-dim: rgba(69, 217, 245, 0.12);
+  --violet: #a99bff; /* secondary graph */
+  --violet-dim: rgba(169, 155, 255, 0.12);
+  --warning: #ffbe55; /* amber */
+  --warning-dim: rgba(255, 190, 85, 0.12);
+  --danger: #ff6b75; /* coral — failure / deletion */
+  --danger-dim: rgba(255, 107, 117, 0.12);
+  --neutral-chip: rgba(168, 181, 202, 0.1);
+
+  /* Glows */
+  --glow-accent: 0 0 0 1px rgba(199, 255, 94, 0.35), 0 0 24px rgba(199, 255, 94, 0.12);
+  --glow-info: 0 0 0 1px rgba(69, 217, 245, 0.3), 0 0 20px rgba(69, 217, 245, 0.1);
+
+  /* Geometry */
+  --radius-sm: 8px;
+  --radius: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 24px;
+
+  /* Type */
+  --font-display: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
+
+  /* Motion */
+  --t-fast: 150ms cubic-bezier(0.3, 0.7, 0.4, 1);
+  --t-med: 220ms cubic-bezier(0.3, 0.7, 0.4, 1);
+
+  /* Layout */
+  --sidebar-w: 248px;
+  --topbar-h: 60px;
+}

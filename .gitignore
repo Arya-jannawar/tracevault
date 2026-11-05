@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+frontend/dist/
+
+# Local secrets / generated
+.env
+.local/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log
+
+# Alembic
+backend/migrations/__pycache__/

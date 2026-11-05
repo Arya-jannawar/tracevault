@@ -1,0 +1,4 @@
+# Optional heavy model stack for "real mode" (genuine MiniLM embeddings).
+# Install only where acceptable: ~200MB+ (CPU torch) plus ~90MB model download.
+torch==2.5.1
+sentence-transformers==3.3.1
