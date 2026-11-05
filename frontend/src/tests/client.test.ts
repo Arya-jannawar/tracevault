@@ -60,7 +60,9 @@ describe('api client', () => {
         request_id: 'req-123',
       }),
     );
-    const err = await api.post('/rag/query', { question: 'x' }).catch((e: unknown) => e as ApiError);
+    const err = (await api
+      .post('/rag/query', { question: 'x' })
+      .catch((e: unknown) => e)) as ApiError;
     expect(err).toBeInstanceOf(ApiError);
     expect(err.status).toBe(409);
     expect(err.code).toBe('publication_blocked');
@@ -74,7 +76,7 @@ describe('api client', () => {
       status: 500,
       json: () => Promise.reject(new Error('not json')),
     } as unknown as Response);
-    const err = await api.get('/documents').catch((e: unknown) => e as ApiError);
+    const err = (await api.get('/documents').catch((e: unknown) => e)) as ApiError;
     expect(err).toBeInstanceOf(ApiError);
     expect(err.status).toBe(500);
     expect(err.code).toBe('unknown');
@@ -89,9 +91,9 @@ describe('api client', () => {
       fetchMock.mockResolvedValue(
         jsonResponse(401, { code: 'auth_failed', message: 'Invalid session.' }),
       );
-      const err = await api
+      const err = (await api
         .post('/auth/login', { username: 'u', password: 'p' }, { skipAuthRedirect: true })
-        .catch((e: unknown) => e as ApiError);
+        .catch((e: unknown) => e)) as ApiError;
       expect(err).toBeInstanceOf(ApiError);
       expect(err.status).toBe(401);
       expect(assignSpy).not.toHaveBeenCalled();
@@ -102,7 +104,7 @@ describe('api client', () => {
 
   it('normalises network failures into an actionable ApiError', async () => {
     fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
-    const err = await api.get('/health/ready').catch((e: unknown) => e as ApiError);
+    const err = (await api.get('/health/ready').catch((e: unknown) => e)) as ApiError;
     expect(err).toBeInstanceOf(ApiError);
     expect(err.status).toBe(0);
     expect(err.code).toBe('network_error');
