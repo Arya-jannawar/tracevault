@@ -59,6 +59,8 @@ class QdrantConnector:
     def upsert_points(self, points: list[dict], *, wait: bool = True) -> ConnectorOutcome:
         """points: [{id, vector, payload}] — payload must carry workspace/document/
         artifact identifiers so retrieval can re-authorize against the registry."""
+        if not points:
+            return ConnectorOutcome(ok=True, acknowledged=True, detail="noop")
         try:
             r = httpx.put(
                 f"{self._base}/collections/{self._collection}/points",
@@ -73,7 +75,12 @@ class QdrantConnector:
                                     detail=wrap_unavailable(exc, "qdrant").message)
 
     def delete_points(self, point_ids: list[str], *, wait: bool = True) -> ConnectorOutcome:
-        """Delete full points (values + payload) by explicit IDs."""
+        """Delete full points (values + payload) by explicit IDs.
+
+        Deleting nothing is an acknowledged noop (idempotent semantics) —
+        Qdrant would reject an empty update request."""
+        if not point_ids:
+            return ConnectorOutcome(ok=True, acknowledged=True, detail="noop")
         try:
             r = httpx.post(
                 f"{self._base}/collections/{self._collection}/points/delete",

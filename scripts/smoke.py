@@ -113,11 +113,19 @@ def main() -> None:
     print(("PASS content blocked (410)" if r.status_code == 410
            else f"FAIL content still accessible: {r.status_code}"))
 
-    # re-query: deleted facts must not be served
+    # re-query: the deleted document's SPECIFIC fact must not be served.
+    # (docD legitimately mentions "Nightingale" with a DIFFERENT budget — that
+    # is independent content, not leakage.)
     r = c.post("/api/v1/rag/query", headers=h, json={"question": q}).json()
-    leaked = "Nightingale" in (r.get("answer") or "") and r.get("citations")
-    print(("PASS re-query does not serve deleted fact"
-           if not leaked else "FAIL deleted fact still served"))
+    answer_text = r.get("answer") or ""
+    cited_deleted = any(
+        cit.get("document_id") == target["id"] for cit in r.get("citations", [])
+    )
+    leaked = ("4.2 crore" in answer_text or "14 March 2026" in answer_text
+              or cited_deleted)
+    print(("PASS re-query does not serve the deleted fact"
+           if not leaked else
+           f"FAIL deleted fact still served (cited_deleted={cited_deleted})"))
 
     print("SMOKE DONE — results above are actual API observations.")
 

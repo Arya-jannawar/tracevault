@@ -324,24 +324,35 @@ def _ms(start, end) -> int:
 
 
 def purge_postgres_content(db: Session, request: DeletionRequest) -> None:
-    """Content purge while preserving operation/lineage records."""
+    """Content purge for the full affected set (edges can make artifacts of
+    OTHER primary documents dependants of the deleted source — conservative
+    invalidation purges them too). Operation/lineage records survive."""
     doc = db.get(Document, request.document_id)
-    if doc is None:
-        return
-    doc.title = REDACTED
-    doc.state = DocumentState.deleted.value
-    for v in db.query(DocumentVersion).filter_by(document_id=doc.id).all():
-        v.content = REDACTED
-        v.filename = REDACTED
-        v.content_state = "removed"
+    report = request.report or {}
+    affected_ids: list[uuid.UUID] = []
+    for raw in report.get("affected_ids", []):
+        try:
+            affected_ids.append(uuid.UUID(raw))
+        except (ValueError, AttributeError):
+            continue
 
-    # chunk + summary + answer + cache artifacts: strip content-bearing meta,
-    # keep lineage metadata, and mark physically removed
-    arts = db.query(Artifact).filter(
-        Artifact.document_id == doc.id,
-        Artifact.type.in_([ArtifactType.chunk, ArtifactType.summary,
-                           ArtifactType.answer, ArtifactType.cache_entry]),
-    ).all()
+    if doc is not None:
+        doc.title = REDACTED
+        doc.state = DocumentState.deleted.value
+        for v in db.query(DocumentVersion).filter_by(document_id=doc.id).all():
+            v.content = REDACTED
+            v.filename = REDACTED
+            v.content_state = "removed"
+
+    # every affected artifact: strip content-bearing meta, keep lineage metadata
+    arts = db.query(Artifact).filter(Artifact.id.in_(affected_ids)).all() \
+        if affected_ids else []
+    if doc is not None and not affected_ids:
+        arts = db.query(Artifact).filter(
+            Artifact.document_id == doc.id,
+            Artifact.type.in_([ArtifactType.chunk, ArtifactType.summary,
+                               ArtifactType.answer, ArtifactType.cache_entry]),
+        ).all()
     for art in arts:
         meta = dict(art.meta or {})
         for key in ("text", "answer", "question", "query", "citations", "snippet"):
@@ -349,29 +360,34 @@ def purge_postgres_content(db: Session, request: DeletionRequest) -> None:
                 meta[key] = REDACTED
         meta["redacted"] = True
         art.meta = meta
-        art.lifecycle_state = LifecycleState.removed.value
+        if art.lifecycle_state != LifecycleState.active.value or \
+                art.type in (ArtifactType.chunk, ArtifactType.answer,
+                             ArtifactType.cache_entry):
+            art.lifecycle_state = LifecycleState.removed.value
 
     for srow in (
         db.query(Summary)
-        .join(Artifact, Artifact.id == Summary.artifact_id)
-        .filter(Artifact.document_id == doc.id)
+        .filter(Summary.artifact_id.in_(affected_ids))
         .all()
+        if affected_ids else []
     ):
         srow.content = REDACTED
         srow.content_state = "removed"
 
     for c in (
         db.query(Claim)
-        .join(Artifact, Artifact.id == Claim.summary_artifact_id)
-        .filter(Artifact.document_id == doc.id)
+        .filter(Claim.summary_artifact_id.in_(affected_ids))
         .all()
+        if affected_ids else []
     ):
         c.text = REDACTED
         c.status = "removed"
 
-    # registry rows for cache entries of this document (reverse index)
+    # registry rows for cache entries tied to this document (reverse index)
+    doc_str = str(request.document_id)
     for entry in db.query(CacheEntry).all():
-        if str(request.document_id) in (entry.document_ids or []):
+        if doc_str in (entry.document_ids or []) or \
+                (affected_ids and entry.artifact_id in affected_ids):
             db.delete(entry)
 
 
