@@ -9,6 +9,8 @@ import os
 
 import pytest
 
+from app.seed import CORPUS
+
 pytestmark = pytest.mark.integration
 
 DATABASE_URL = os.environ.get(
@@ -98,17 +100,23 @@ def test_full_flow_ingest_query_delete_repair(pg_db, real_env, adapters,
     qdrant.ensure_collection()
 
     ws = get_or_create_default_workspace(pg_db, f"itest-{os.getpid()}")
-    # clean workspace tables for determinism (test-owned volumes only)
-    pg_db.execute(sa_text(
-        "DELETE FROM dependency_edges WHERE child_artifact_id IN "
-        "(SELECT id FROM artifacts WHERE workspace_id = :w)"),
-        {"w": ws.id})
-    pg_db.execute(sa_text("DELETE FROM artifacts WHERE workspace_id = :w"),
-                  {"w": ws.id})
-    pg_db.execute(sa_text(
-        "DELETE FROM cache_entries WHERE workspace_id = :w"), {"w": ws.id})
-    pg_db.execute(sa_text(
-        "DELETE FROM tombstones WHERE workspace_id = :w"), {"w": ws.id})
+    # clean workspace tables for determinism (test-owned volumes only), FK-safe order
+    for stmt in [
+        "DELETE FROM verification_checks WHERE request_id IN (SELECT id FROM deletion_requests WHERE workspace_id = :w)",
+        "DELETE FROM deletion_steps WHERE request_id IN (SELECT id FROM deletion_requests WHERE workspace_id = :w)",
+        "DELETE FROM deletion_requests WHERE workspace_id = :w",
+        "DELETE FROM write_intents WHERE workspace_id = :w",
+        "DELETE FROM claim_supports WHERE claim_id IN (SELECT c.id FROM claims c JOIN artifacts a ON a.id = c.summary_artifact_id WHERE a.workspace_id = :w)",
+        "DELETE FROM claims WHERE summary_artifact_id IN (SELECT id FROM artifacts WHERE workspace_id = :w)",
+        "DELETE FROM summaries WHERE artifact_id IN (SELECT id FROM artifacts WHERE workspace_id = :w)",
+        "DELETE FROM cache_entries WHERE workspace_id = :w",
+        "DELETE FROM tombstones WHERE workspace_id = :w",
+        "DELETE FROM dependency_edges WHERE parent_artifact_id IN (SELECT id FROM artifacts WHERE workspace_id = :w) OR child_artifact_id IN (SELECT id FROM artifacts WHERE workspace_id = :w)",
+        "DELETE FROM artifacts WHERE workspace_id = :w",
+        "DELETE FROM document_versions WHERE document_id IN (SELECT id FROM documents WHERE workspace_id = :w)",
+        "DELETE FROM documents WHERE workspace_id = :w",
+    ]:
+        pg_db.execute(sa_text(stmt), {"w": ws.id})
     pg_db.commit()
 
     doc_a = create_document(pg_db, workspace_id=ws.id,
@@ -134,7 +142,15 @@ def test_full_flow_ingest_query_delete_repair(pg_db, real_env, adapters,
     run_deletion(pg_db, real_env, request_id=request.id, qdrant=qdrant,
                  redis_c=redis_c)
     pg_db.refresh(request)
-    assert request.state == DeletionState.completed.value
+    from app.models import VerificationCheck
+
+    bad_checks = [
+        (c.check_type, c.target_label, c.result, c.error_code)
+        for c in pg_db.query(VerificationCheck).filter_by(request_id=request.id).all()
+        if c.result not in ("passed", "not_applicable")
+    ]
+    assert request.state == DeletionState.completed.value, \
+        f"failed verification checks: {bad_checks}, reason={request.failure_reason}"
 
     # real Qdrant: points gone
     chunk_ids = [str(a.id) for a in pg_db.query(Artifact).filter_by(
@@ -150,14 +166,7 @@ def test_full_flow_ingest_query_delete_repair(pg_db, real_env, adapters,
     hits = qdrant.search(emb.embed(["Aurora LMS maintenance window"])[0],
                          limit=5, workspace_id=ws.id)
     assert any(h["payload"]["document_id"] == str(doc_b.id) for h in hits)
-
-    # cleanup test workspace rows
-    pg_db.execute(sa_text("DELETE FROM dependency_edges WHERE child_artifact_id IN "
-                          "(SELECT id FROM artifacts WHERE workspace_id = :w)"),
-                  {"w": ws.id})
-    pg_db.execute(sa_text("DELETE FROM artifacts WHERE workspace_id = :w"),
-                  {"w": ws.id})
-    pg_db.commit()
+    # cleanup happens at the start of the next run (FK-safe order there)
 
 
 def test_worker_restarts_and_retries(pg_db, real_env, adapters, real_connectors):

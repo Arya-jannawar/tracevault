@@ -89,9 +89,11 @@ class QdrantConnector:
 
     def retrieve_points(self, point_ids: list[str],
                         with_payload: bool = True) -> list[dict]:
+        """Get points by explicit IDs (Qdrant 'look up points' API:
+        POST /collections/{name}/points)."""
         try:
             r = httpx.post(
-                f"{self._base}/collections/{self._collection}/points/retrieve",
+                f"{self._base}/collections/{self._collection}/points",
                 json={"ids": point_ids, "with_payload": with_payload},
                 timeout=_TIMEOUT,
             )

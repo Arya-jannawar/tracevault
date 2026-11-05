@@ -18,19 +18,16 @@ services:
       retries: 30
 
   qdrant:
+    # distroless image: no shell for an in-container healthcheck; the API's
+    # /health/ready performs the qdrant health probe out-of-band instead.
     image: qdrant/qdrant:v1.14.1
     ports:
       - "127.0.0.1:6333:6333"
     volumes:
       - qdrantdata:/qdrant/storage
-    healthcheck:
-      test: ["CMD-SHELL", "(exec 3<>/dev/tcp/127.0.0.1/6333 && echo -e 'GET /healthz HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3) | head -1 | grep -q 200"]
-      interval: 5s
-      timeout: 4s
-      retries: 30
 
   redis:
-    image: redis:7.4.1-alpine
+    image: redis:7.4.1
     ports:
       - "127.0.0.1:6379:6379"
     healthcheck:
@@ -61,7 +58,7 @@ services:
       postgres:
         condition: service_healthy
       qdrant:
-        condition: service_healthy
+        condition: service_started
       redis:
         condition: service_healthy
     ports:
@@ -90,7 +87,7 @@ services:
       postgres:
         condition: service_healthy
       qdrant:
-        condition: service_healthy
+        condition: service_started
       redis:
         condition: service_healthy
     command: sh -c "alembic upgrade head && python -m app.worker"
