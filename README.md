@@ -146,12 +146,29 @@ distinct from COMPLETED.
 | Symptom | Fix |
 |---|---|
 | `docker compose` can't connect | start Docker Desktop, wait for the whale icon |
+| `docker pull` fails with `registry-1.docker.io` timeouts | Docker Hub is blocked on some networks — use `public.ecr.aws/docker/library/<image>:<tag>` (official mirror) and `docker tag` it to the compose name, e.g. `docker pull public.ecr.aws/docker/library/redis:7.4.1 && docker tag public.ecr.aws/docker/library/redis:7.4.1 redis:7.4.1` |
 | API 503 `adapter_unavailable` (embeddings) | install `requirements-models.txt` or set `EMBEDDING_PROVIDER=deterministic` |
 | API 503 `adapter_unavailable` (LLM) | start Ollama/llama.cpp or set `LLM_PROVIDER=extractive` |
 | Login rejected | re-run `python -m app.bootstrap` (or set `ADMIN_PASSWORD` in .env) |
 | Documents stuck "ingesting" | worker not running: `docker compose up -d worker` |
 | `415 unsupported_content` on PDF | scanned/image-only PDF — OCR not implemented; use text PDFs |
 | Reset demo data (**destructive, local volumes only**) | `docker compose down -v` then start again |
+
+### Network-restricted setup (hybrid, used for the verified live demo)
+
+If in-container builds stall on your network, run the backing services in
+Docker and the app from a local venv — this is exactly how the delivered demo
+was verified:
+
+```powershell
+docker compose up -d postgres qdrant redis
+cd backend ; ..\.venv\Scripts\alembic upgrade head ; ..\.venv\Scripts\python -m app.bootstrap
+start ..\.venv\Scripts\python -m uvicorn app.main:app --host 127.0.0.1 --port 8000   # API
+start ..\.venv\Scripts\python -m app.worker                                          # worker
+docker run -d --name tracevault-frontend-dev -p 127.0.0.1:8080:80 `
+  -v "$(pwd)\frontend\nginx.dev.conf:/etc/nginx/conf.d/default.conf:ro" `
+  tracevault-frontend:latest   # build once: docker compose build frontend
+```
 
 ## Repository layout
 
