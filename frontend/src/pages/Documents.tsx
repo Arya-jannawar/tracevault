@@ -1,13 +1,12 @@
 /* Documents — searchable, filterable, paginated table + upload dialog
    (file drag-drop or pasted text; honest 415/422 validation messages). */
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import {
   ChevronLeft,
   ChevronRight,
   FileText,
-  Loader2,
   Search,
   Upload,
   X,
@@ -253,26 +252,7 @@ export function Documents() {
   );
 }
 
-/* Exposed for tests and reuse: derive next-page availability. */
-export function canGoNext(rows: number, pageSize: number): boolean {
-  return rows === pageSize;
-}
-
-/* Thin wrapper kept for the toolbar button used by Overview quick actions. */
-export function UploadButton({ onClick }: { onClick?: () => void }) {
-  const ref = useRef<HTMLButtonElement>(null);
-  return (
-    <button ref={ref} type="button" className="btn btn-primary" onClick={onClick}>
-      <Loader2 aria-hidden="true" style={{ display: 'none' }} />
-      <Upload aria-hidden="true" /> Upload document
-    </button>
-  );
-}
-
-/* re-export for tests */
-export { DOC_STATES };
-
-/* helper used by UploadDialog to surface 415/422 messages */
+/* Surfaces the contract's 415/422 validation messages verbatim. */
 export function uploadErrorMessage(err: unknown): string {
   if (err instanceof ApiError) {
     if (err.status === 415) return err.message;
@@ -281,5 +261,3 @@ export function uploadErrorMessage(err: unknown): string {
   }
   return 'Upload failed unexpectedly.';
 }
-
-export type { ChangeEvent, DragEvent };

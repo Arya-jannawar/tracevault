@@ -15,12 +15,13 @@ export interface TopbarAction {
   onClick: () => void;
 }
 
-interface TopbarActionApi {
+export interface TopbarActionApi {
   action: TopbarAction | null;
   register: (action: TopbarAction | null) => void;
 }
 
 const TopbarActionContext = createContext<TopbarActionApi | null>(null);
+export { TopbarActionContext };
 
 export function TopbarActionProvider({ children }: { children: ReactNode }) {
   const [action, setAction] = useState<TopbarAction | null>(null);

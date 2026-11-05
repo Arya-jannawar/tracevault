@@ -6,6 +6,7 @@ import { ChevronRight, LogOut, Menu } from 'lucide-react';
 import { HealthDot } from './HealthDot';
 import { useAuth } from '../hooks/AuthProvider';
 import { TopbarActionContext } from '../hooks/useTopbarAction';
+import type { TopbarActionApi } from '../hooks/useTopbarAction';
 import { shortId } from '../lib/format';
 
 interface Crumb {

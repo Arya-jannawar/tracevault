@@ -1,18 +1,18 @@
 /* Small accessible tab strip (role=tablist) used by detail pages. */
-export interface TabDef {
-  id: string;
+export interface TabDef<T extends string = string> {
+  id: T;
   label: string;
   count?: number;
 }
 
-export function Tabs({
+export function Tabs<T extends string>({
   tabs,
   active,
   onChange,
 }: {
-  tabs: TabDef[];
-  active: string;
-  onChange: (id: string) => void;
+  tabs: TabDef<T>[];
+  active: T;
+  onChange: (id: T) => void;
 }) {
   return (
     <div className="tabs" role="tablist" aria-label="Detail sections">
