@@ -34,9 +34,17 @@ describe('ImpactPreview — deletion impact counts', () => {
 
   it('renders one count card per affected type with the correct value', () => {
     render(<ImpactPreview impact={IMPACT} />);
+    const labels: Record<string, string> = {
+      chunk: 'Chunks',
+      vector: 'Vectors',
+      summary: 'Summaries',
+      answer: 'Answers',
+      document_version: 'Document versions',
+    };
     for (const [type, count] of Object.entries(IMPACT.affected_by_type)) {
+      if (count === 0) continue; // zero-count types are omitted by design
       const card = screen
-        .getByText(type.replace(/_/g, ' '))
+        .getByText(labels[type] ?? type)
         .closest('.metric-card') as HTMLElement;
       expect(within(card).getByText(String(count))).toBeInTheDocument();
     }
@@ -44,7 +52,7 @@ describe('ImpactPreview — deletion impact counts', () => {
 
   it('omits types with zero affected artifacts (cache_entry has 0)', () => {
     render(<ImpactPreview impact={IMPACT} />);
-    expect(screen.queryByText('cache entry')).not.toBeInTheDocument();
+    expect(screen.queryByText('Cache entries')).not.toBeInTheDocument();
     expect(screen.getByText('Chunks')).toBeInTheDocument();
   });
 

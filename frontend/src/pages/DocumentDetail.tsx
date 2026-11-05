@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { api } from '../api/client';
 import type {
+  Capabilities,
   ChunkOut,
   DeletionImpact,
   DeletionRequestOut,
@@ -58,6 +59,13 @@ export function DocumentDetail() {
     queryFn: () => api.get<DeletionImpact>(`/documents/${id}/deletion-impact`),
     enabled: !!id,
   });
+
+  const capsQuery = useQuery<Capabilities>({
+    queryKey: ['capabilities'],
+    queryFn: () => api.get<Capabilities>('/system/capabilities'),
+    staleTime: 60_000,
+  });
+  const pendingJobs = capsQuery.data?.flags?.pending_jobs ?? 0;
 
   const detail = detailQuery.data;
   const impact = impactQuery.data;
@@ -168,7 +176,9 @@ export function DocumentDetail() {
       />
 
       {tab === 'content' && <ContentTab documentId={id} title={detail.title} />}
-      {tab === 'chunks' && <ChunksTab documentId={id} ingestionPending={ingestionPending} />}
+      {tab === 'chunks' && (
+        <ChunksTab documentId={id} ingestionPending={ingestionPending} pendingJobs={pendingJobs} />
+      )}
       {tab === 'versions' && <VersionsTab documentId={id} />}
       {tab === 'artifacts' && (
         <section className="stack" id="panel-artifacts" role="tabpanel" aria-label="Artifacts">
@@ -184,8 +194,9 @@ export function DocumentDetail() {
               <Clock aria-hidden="true" />
               <div className="callout-body">
                 <div className="callout-title">Ingestion in progress</div>
-                No chunks registered yet. The pipeline is still working — this
-                view refreshes automatically until artifacts appear.
+                No chunks registered yet. The pipeline is still working
+                {pendingJobs > 0 ? ` — ${pendingJobs} job(s) queued or running` : ''} —
+                this view refreshes automatically until artifacts appear.
               </div>
             </div>
           )}
@@ -333,9 +344,11 @@ function ContentTab({ documentId, title }: { documentId: string; title: string }
 function ChunksTab({
   documentId,
   ingestionPending,
+  pendingJobs,
 }: {
   documentId: string;
   ingestionPending: boolean;
+  pendingJobs: number;
 }) {
   const query = useQuery<ChunkOut[]>({
     queryKey: ['document-chunks', documentId],
@@ -363,7 +376,7 @@ function ChunksTab({
         title="No chunks registered"
       >
         {ingestionPending
-          ? 'Ingestion is still running — this list fills in automatically.'
+          ? `Ingestion is still running${pendingJobs > 0 ? ` (${pendingJobs} job(s) pending)` : ''} — this list fills in automatically.`
           : 'This document has no chunk artifacts. Re-upload it to build the index.'}
       </EmptyState>
     );

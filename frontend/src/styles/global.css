@@ -1313,10 +1313,7 @@ input[type='date'] {
   position: relative;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  background:
-    radial-gradient(rgba(168, 181, 202, 0.07) 1px, transparent 1px);
-  background-size: 22px 22px;
-  background-color: var(--panel-2);
+  background: var(--panel-2);
   overflow: hidden;
 }
 .graph-wrap .react-flow__attribution {

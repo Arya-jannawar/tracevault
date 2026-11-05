@@ -1,7 +1,7 @@
 /* API client unit tests: CSRF header on mutations, JSON envelope parsing into
    ApiError, 401 suppression, network-failure normalisation. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, api } from '../api/client';
+import { ApiError, api, authRedirect } from '../api/client';
 
 function jsonResponse(status: number, body: unknown): Response {
   return {
@@ -84,9 +84,9 @@ describe('api client', () => {
   });
 
   it('does not redirect on 401 when skipAuthRedirect is set (login flow)', async () => {
-    const assignSpy = vi.fn();
-    const originalAssign = window.location.assign;
-    window.location.assign = assignSpy as typeof window.location.assign;
+    const toLoginSpy = vi.fn();
+    const originalToLogin = authRedirect.toLogin;
+    authRedirect.toLogin = toLoginSpy;
     try {
       fetchMock.mockResolvedValue(
         jsonResponse(401, { code: 'auth_failed', message: 'Invalid session.' }),
@@ -96,9 +96,25 @@ describe('api client', () => {
         .catch((e: unknown) => e)) as ApiError;
       expect(err).toBeInstanceOf(ApiError);
       expect(err.status).toBe(401);
-      expect(assignSpy).not.toHaveBeenCalled();
+      expect(toLoginSpy).not.toHaveBeenCalled();
     } finally {
-      window.location.assign = originalAssign;
+      authRedirect.toLogin = originalToLogin;
+    }
+  });
+
+  it('redirects to /login on 401 for protected endpoints', async () => {
+    const toLoginSpy = vi.fn();
+    const originalToLogin = authRedirect.toLogin;
+    authRedirect.toLogin = toLoginSpy;
+    try {
+      fetchMock.mockResolvedValue(
+        jsonResponse(401, { code: 'auth_failed', message: 'Sign-in required.' }),
+      );
+      await api.get('/documents').catch(() => undefined);
+      expect(toLoginSpy).toHaveBeenCalledTimes(1);
+      expect(toLoginSpy.mock.calls[0][0]).toContain('/login');
+    } finally {
+      authRedirect.toLogin = originalToLogin;
     }
   });
 

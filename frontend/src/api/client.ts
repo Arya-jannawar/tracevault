@@ -84,8 +84,8 @@ async function parseEnvelope(res: Response): Promise<Partial<ErrorEnvelope>> {
 
 /** Injectable redirect seam so tests can observe 401 handling. */
 export const authRedirect = {
-  toLogin(next: string): void {
-    window.location.assign(next ? `/login?next=${next}` : '/login');
+  toLogin(target: string): void {
+    window.location.assign(target);
   },
 };
 
@@ -125,7 +125,8 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   if (res.status === 401 && !skipAuthRedirect) {
     const { pathname, search } = window.location;
     if (!pathname.startsWith('/login')) {
-      authRedirect.toLogin(encodeURIComponent(pathname + search));
+      const next = encodeURIComponent(pathname + search);
+      authRedirect.toLogin(next ? `/login?next=${next}` : '/login');
     }
   }
 
